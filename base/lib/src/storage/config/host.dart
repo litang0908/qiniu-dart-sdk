@@ -34,10 +34,14 @@ class DefaultHostProvider extends HostProvider {
     if ('$accessKey:$bucket' == _cacheKey && _stashedUpDomains.isNotEmpty) {
       upDomains.addAll(_stashedUpDomains);
     } else {
-      final url =
-          '$protocol://api.qiniu.com/v4/query?ak=$accessKey&bucket=$bucket';
-
-      final res = await _http.get<Map>(url);
+      // 从备用域名中获取配置
+      final res = await _getUploadHostConfig(accessKey, bucket);
+      if (res == null) {
+        throw StorageError(
+          type: StorageErrorType.NO_AVAILABLE_HOST,
+          message: 'Can not get upload host.',
+        );
+      }
 
       final hosts = res.data!['hosts']
           .map((dynamic json) => _Host.fromJson(json as Map))
@@ -87,6 +91,33 @@ class DefaultHostProvider extends HostProvider {
     final uri = Uri.parse(host);
     _frozenUpDomains.add(_Domain(uri.host)..freeze());
   }
+
+  // 轮询获得上传域名，此处与原官网 SDK 比，增加了备用域名
+  Future<Response<Map>?> _getUploadHostConfig(
+      String accessKey, String bucket) async {
+    Response<Map>? res;
+    List<String> hosts = backupHosts();
+    for (var host in hosts) {
+      print("七牛云：获得上传域名配置 $host");
+      final url = '$protocol://$host/v4/query?ak=$accessKey&bucket=$bucket';
+      try {
+        res = await _http.get<Map>(url);
+        if (res.data != null && res.data!['hosts'] != null) {
+          return res;
+        }
+      } catch (err) {
+        print(err);
+      }
+    }
+    return res;
+  }
+
+  static List<String> backupHosts() => [
+    'uc.qiniuapi.com',
+    'kodo-config.qiniuapi.com',
+    'uc.qbox.me',
+    // 'api.qiniu.com',//deprecated
+  ];
 }
 
 class _Host {
