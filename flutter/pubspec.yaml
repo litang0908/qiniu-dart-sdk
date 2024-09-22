@@ -5,7 +5,7 @@ homepage: https://github.com/qiniu/dart-sdk/tree/master/flutter
 
 environment:
   sdk: ">=2.19.6 <4.0.0"
-  flutter: ">=3.7.12"
+  flutter: ">=3.3.0"
 
 dependencies:
   flutter:
